@@ -10,72 +10,71 @@ class BaseModel(models.Model):
         abstract = True
 
 class Event(BaseModel):
-    CATEGORY_CHOISES = [
-        ('concert', 'Concert'),
-        ('sports', 'Sports'),
-        ('theater' , 'Theater'),
-        ('presentation' , 'Presentation'),
-        ('conference' , 'Conderence'),
-        ('show' , 'Show'),
-        ('other' , 'Other'),
-    ]
-    event_id = models.AutoField(primary_key=True)
+    class Category(models.TextChoices):
+        CONCERT = 'concert', 'Concert'
+        SPORTS = 'sports', 'Sports'
+        THEATER = 'theater', 'Theater'
+        PRESENTATION = 'presentation', 'Presentation'
+        CONFERENCE = 'conference', 'Conference'
+        OTHER = 'other', 'Other'
+
     title = models.CharField(max_length=120)
     description = models.TextField()
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOISES)
+    category = models.CharField(max_length=50, choices=Category.choices, default=Category.OTHER)
     date = models.DateTimeField()
     location = models.CharField(max_length=120)
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal(0.00))])
     available_tickets = models.PositiveIntegerField()
 
     class Meta:
-        db_table = 'events_event'
+        verbose_name = 'event'
+        verbose_name_plural = 'events'
         ordering = ['date']
 
     def __str__(self):
         return self.title
     
 class EventImage(BaseModel):
-    image_id = models.AutoField(primary_key=True)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='images')
-    image_url = models.ImageField(upload_to='event_images/')
+    image = models.ImageField(upload_to='event_images/')
 
     class Meta:
-        db_table = 'events_eventimage'
+        verbose_name = 'eventImage'
+        verbose_name_plural = 'eventImages'
     
     def __str__(self):
         return f"Image for {self.event.title}"
     
 class Order(BaseModel):
-    STATUS_CHOISES = [
-        ('pending' , 'Pending'),
-        ('cancelled' , 'Cancelle3d'),
-        ('confirmed' , 'Confirmed'),
-        ('completed' , 'Completed'),
-    ]
-    order_id = models.AutoField(primary_key=True) 
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        CANCELLED = 'cancelled', 'Cancelled'
+        CONFIRMED = 'confirmed', 'Confirmed'
+        COMPLETED = 'completed', 'Completed'
+    
     customer_email = models.EmailField()
     customer_name = models.CharField(max_length=25)
     customer_phone =models.CharField(max_length=20)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
-    status = models.CharField(max_length=20, choices=STATUS_CHOISES, default='pending')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
 
     class Meta:
-        db_table = 'events_order'
+        verbose_name = 'order'
+        verbose_name_plural = 'orders'
         ordering = ['-created_at']
     
     def __str__(self):
         return f"Order #{self.order_id} - {self.customer_name}"
     
 class OrderItem(BaseModel):
-    item_id = models.AutoField(primary_key=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
 
     class Meta:
-        db_table = 'events_orderitem'
+        verbose_name = 'item'
+        verbose_name_plural = 'items'
     
     def __str__(self):
         return f"{self.quantity}x {self.event.title}"
