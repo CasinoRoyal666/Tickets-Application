@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import Event, EventImage, Order, OrderItem
 from django.utils.html import format_html
 
-class EventImageAdmin(admin.StackedInline):
+class EventImageInline(admin.StackedInline):
     model = EventImage
     extra = 1
     readonly_fields = ('image_preview',)
@@ -34,7 +34,7 @@ class EventAdmin(admin.ModelAdmin):
         })
     )
 
-    inlines = [EventImageAdmin]
+    inlines = [EventImageInline]
 
     def tickets_status(self,obj):
         if obj.available_tickets == 0:
@@ -52,5 +52,51 @@ class EventAdmin(admin.ModelAdmin):
         )
     tickets_status.short_description = "Ticket Status"
 
+
+class OrderitemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 1
+    readonly_fields = ('amount_total_price',)
+
+    def amount_total_price(self,obj):
+        if obj.pk:
+            return f"{obj.total_price}"
+        return "-"
+    amount_total_price.short_description = "Amount"
+
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ('id', 'customer_name', 'customer_email', 'total_price', 'status', 'order_status_color', 'created_at')
+    search_fields = ('customer_name', 'customer_email', 'customer_phone')
+    list_filter = ('status', 'created_at')
+    readonly_fields = ('created_at', 'updated_at')
+
+    fieldsets = (
+        ('Customer Information', {
+            'fields' : ('customer_name', 'customer_email', 'customer_phone')
+        }),
+        ('Order Information', {
+            'fields' : ('total_price', 'status')
+        }),
+        ('System Information', {
+            'fields' : ('created_at', 'updated_at')
+        })
+    )
+
+    def order_status_color(self,obj):
+       colors = {
+            'pending' : 'yellow',
+            'cancelled': 'red',
+            'confirmed' : 'lightblue',
+            'completed' : 'green'
+       } 
+       color = colors.get(obj.status, 'gray')
+       return format_html(
+           '<span style="background-color: {}; color: black; padding: 3px 8px; '
+           'border-radius: 3px; font-size: 12px;">{}</span>',
+           color, obj.get_status_display()
+       )
+    order_status_color.short_description = "Status"
+    inlines = [OrderitemInline]
+
 admin.site.register(Event, EventAdmin)
-admin.site.register(Order)
+admin.site.register(Order, OrderAdmin)
