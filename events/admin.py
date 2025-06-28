@@ -68,7 +68,7 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'customer_name', 'customer_email', 'total_price', 'status', 'order_status_color', 'created_at')
     search_fields = ('customer_name', 'customer_email', 'customer_phone')
     list_filter = ('status', 'created_at')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'total_price')
 
     fieldsets = (
         ('Customer Information', {

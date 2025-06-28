@@ -55,8 +55,11 @@ class Order(BaseModel):
     customer_email = models.EmailField()
     customer_name = models.CharField(max_length=25)
     customer_phone =models.CharField(max_length=20)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING)
+
+    @property
+    def total_price(self):
+        return sum((item.total_price for item in self.items.all()), Decimal('0.00'))
 
     class Meta:
         verbose_name = 'order'
