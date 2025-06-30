@@ -56,7 +56,7 @@ class EventAdmin(admin.ModelAdmin):
 class OrderitemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
-    readonly_fields = ('amount_total_price',)
+    readonly_fields = ('unit_price','amount_total_price')
 
     def amount_total_price(self,obj):
         if obj.pk:
