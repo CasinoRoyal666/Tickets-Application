@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import  Event, EventImage, Order, OrderItem
+from .services import create_order
 
 class EventImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -56,10 +57,4 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         fields = ['customer_email', 'customer_name', 'customer_phone', 'items']
     
     def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        order = Order.objects.create(**validated_data)
-
-        for item_data in items_data:
-            OrderItem.objects.create(order=order, **item_data)
-
-        return order
+        return create_order(validated_data)
