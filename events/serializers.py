@@ -49,12 +49,16 @@ class OrderSerializer(serializers.ModelSerializer):
             'status_display', 'total_price', 'items', 'created_at', 'updated_at'
         ]
 
+class OrderItemCreateSerializer(serializers.ModelSerializer):
+    event = serializers.PrimaryKeyRelatedField(queryset=Event.objects.all())
+
+    class Meta:
+        model = OrderItem
+        fields = ['event', 'quantity']\
+
 class OrderCreateSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
 
     class Meta:
         model = Order
         fields = ['customer_email', 'customer_name', 'customer_phone', 'items']
-    
-    def create(self, validated_data):
-        return create_order(validated_data)

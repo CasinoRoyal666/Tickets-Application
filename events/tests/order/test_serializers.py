@@ -7,7 +7,7 @@ from events.services import create_order
 
 
 @pytest.fixture
-def events():
+def events(db):
     event1 = Event.objects.create(
         title="TestConc1",
         description="testdescr",
@@ -30,7 +30,7 @@ def events():
     return event1, event2
 
 @pytest.fixture
-def order_with_item(events):
+def order_with_item(db, events):
     event = events[0]
     order = Order.objects.create(
         customer_email='test@example.com',
@@ -56,13 +56,11 @@ def test_create_order_with_items(events):
         'items': [
             {
                 'event': event1.id,
-                'quantity': 2,
-                'unit_price': '2500.00'
+                'quantity': 2
             },
             {
                 'event': event2.id,
-                'quantity': 1,
-                'unit_price': '1500.00'
+                'quantity': 1
             }
         ]
     }
@@ -79,7 +77,6 @@ def test_create_order_with_items(events):
     expected_total = Decimal('2500.00') * 2 + Decimal('1500.00') * 1
     assert order.total_price == expected_total
 
-@pytest.mark.django_db
 def test_create_order_invalid_email():
     data = {
         'customer_email': 'invalid-email', 

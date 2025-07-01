@@ -5,6 +5,9 @@ def create_order(validated_data):
     order = Order.objects.create(**validated_data)
 
     for item_data in items_data:
-        OrderItem.objects.create(order=order, **item_data)
-
+        OrderItem.objects.create(
+            order=order,
+            event=item_data['event'],
+            quantity=item_data['quantity']
+        )
     return order
