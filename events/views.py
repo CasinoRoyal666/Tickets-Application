@@ -144,4 +144,70 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
         filterset_fields = ['order', 'event']
         permission_classes = [AllowAny]
 
-            
+class CartViewSet(viewsets.ViewSet):
+    permission_classes = [AllowAny]
+
+    def list(self, request):
+        cart = request.session.get('cart', {})
+        #for empty
+        if not cart:
+            return Response({'items': [], 'total_price': 0})
+        
+        event_ids = cart.keys()
+        events = Event.objects.filter(id__in=event_ids) # for all events_ids
+        
+        total_price = 0
+        cart_items = []
+        #return list of all items in cart
+        for event in events:
+            quantity = cart[str(event.id)]
+            item_total = event.price * quantity
+            total_price += item_total
+            cart_items.append({
+                'event' : EventListSerializer(event).data,
+                'quantity' : quantity,
+                'item_total_price' : item_total 
+            })
+        return Response({'items' : cart_items, 'total_price' : total_price})
+    
+    #cart add
+    def create(self,request):
+        event_id = request.data.get('event_id')
+        quantity = request.data.get('quantity')
+
+        if not all([event_id, quantity]):
+            return Response({'error' : 'event_id and quantity fields are required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return Response({'error' : 'Quantity must be > 0'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:
+            return Response({'error' : 'Quantity must be a digit'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            event = Event.objects.get(id=event_id)
+            if event.available_tickets < quantity:
+                return Response({'error' : 'Not enough tickets. Available : {event.available_tickets}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Event.DoesNotExist:
+            return Response({'error' : 'Event does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        cart = request.session.get('cart', {})
+        cart[str(event_id)] = quantity
+        request.session['cart'] = cart
+
+        return self.list(request)
+    
+def destroy(self,request, pk=None):
+    cart = request.session.get('cart', {})
+    event_id_remove = str(pk)
+
+    if event_id_remove in cart:
+        del cart[event_id_remove]
+        request.session['cart'] = cart
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    else:
+        return Response({'error' : 'Item not found in cart'}, status=status.HTTP_400_BAD_REQUEST)
+    
+@action(detail=False,methods=['post'])
+def clear(self, request):
+    request.session['cart'] = {}
+    return Response({'message' : 'Cart cleared'}, status=status.HTTP_200_OK)
