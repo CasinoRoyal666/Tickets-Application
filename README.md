@@ -24,3 +24,22 @@ To run specific file, for example "test_event_serializer.py" use "pytest events/
 
 To run specific test, for example "test_create_order_with_items" from "test_order_serializers.py" use "pytest events/tests/order/test_order_serializers.py::test_create_order_with_items" command in root directory, or just 
 "pytest test_order_serializers.py::test_create_order_with_items" from test file directory.
+
+--API TESTS--
+To run API tests use Postman (or something else). In URL field write "http://127.0.0.1:8000/events/" or   "http://127.0.0.1:8000/orders/"
+
+Some examples for tests:
+- Post new order:    Choose POST and URL "http://127.0.0.1:8000/orders/", also in HEADERS choose "Content-Type"  - "application/json"
+- In "BODY":     {
+    "customer_name": "Postman",
+    "customer_email": "postpost@gmail.com",
+    "customer_phone": "375257661875",
+    
+    "items": [
+        {
+            "event": 1,
+            "quantity": 2
+        }
+    ]
+}
+- You see the status "201 CREATED" and info about a new order.

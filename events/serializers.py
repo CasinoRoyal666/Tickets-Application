@@ -57,7 +57,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         fields = ['event', 'quantity']\
 
 class OrderCreateSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True)
+    items = OrderItemCreateSerializer(many=True)
 
     class Meta:
         model = Order
