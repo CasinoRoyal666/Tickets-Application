@@ -71,17 +71,18 @@ class OrderViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            order = create_order(serializer.validated_data)
+            
+        order = create_order(serializer.validated_data)
 
             #reducing tickets after creating order
-            for item_data in items_data:
-                event = item_data['event']
-                quantity = item_data['quantity']
-                event.available_tickets -= quantity
-                event.save()
+        for item_data in items_data:
+            event = item_data['event']
+            quantity = item_data['quantity']
+            event.available_tickets -= quantity
+            event.save()
                 
-            order_serializer = OrderSerializer(order)
-            return Response(order_serializer.data, status=status.HTTP_201_CREATED)
+        order_serializer = OrderSerializer(order)
+        return Response(order_serializer.data, status=status.HTTP_201_CREATED)
             
     @action(detail=True,methods=['post'])
     def confirm(self, request, pk=None):
@@ -186,7 +187,7 @@ class CartViewSet(viewsets.ViewSet):
         try:
             event = Event.objects.get(id=event_id)
             if event.available_tickets < quantity:
-                return Response({'error' : 'Not enough tickets. Available : {event.available_tickets}'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error' : f'Not enough tickets. Available : {event.available_tickets}'}, status=status.HTTP_400_BAD_REQUEST)
         except Event.DoesNotExist:
             return Response({'error' : 'Event does not exist'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -196,18 +197,18 @@ class CartViewSet(viewsets.ViewSet):
 
         return self.list(request)
     
-def destroy(self,request, pk=None):
-    cart = request.session.get('cart', {})
-    event_id_remove = str(pk)
+    def destroy(self,request, pk=None):
+        cart = request.session.get('cart', {})
+        event_id_remove = str(pk)
 
-    if event_id_remove in cart:
-        del cart[event_id_remove]
-        request.session['cart'] = cart
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    else:
-        return Response({'error' : 'Item not found in cart'}, status=status.HTTP_400_BAD_REQUEST)
+        if event_id_remove in cart:
+            del cart[event_id_remove]
+            request.session['cart'] = cart
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'error' : 'Item not found in cart'}, status=status.HTTP_400_BAD_REQUEST)
     
-@action(detail=False,methods=['post'])
-def clear(self, request):
-    request.session['cart'] = {}
-    return Response({'message' : 'Cart cleared'}, status=status.HTTP_200_OK)
+    @action(detail=False,methods=['post'])
+    def clear(self, request):
+        request.session['cart'] = {}
+        return Response({'message' : 'Cart cleared'}, status=status.HTTP_200_OK)
