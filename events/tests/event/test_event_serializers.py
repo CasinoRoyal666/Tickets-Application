@@ -2,7 +2,7 @@ import pytest
 from decimal import Decimal
 from datetime import datetime, timezone
 from events.models import Event
-from events.serializers import EventSerializer
+from events.serializers.events_serializers import EventSerializer
 
 @pytest.fixture
 def event():

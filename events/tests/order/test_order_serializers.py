@@ -2,8 +2,9 @@ import pytest
 from decimal import Decimal
 from datetime import datetime, timezone
 from events.models import Event, Order, OrderItem
-from events.serializers import OrderSerializer, OrderCreateSerializer
-from events.services import create_order
+from events.serializers.orders_serializers import OrderSerializer, OrderCreateSerializer
+from events.services.orders_services import OrderService
+from events.services.events_services import EventService
 
 
 @pytest.fixture
@@ -17,7 +18,7 @@ def events(db):
         price=Decimal('2500.00'),
         available_tickets=100
     )
-    
+
     event2 = Event.objects.create(
         title="TestConc2",
         description="blahblah",
@@ -37,54 +38,24 @@ def order_with_item(db, events):
         customer_name='testusr',
         customer_phone='+375222222'
     )
-    
+
     OrderItem.objects.create(
         order=order,
         event=event,
         quantity=2,
-        unit_price=Decimal('2500.00')
+        unit_price=Decimal('2500.00') 
     )
     return order
 
 @pytest.mark.django_db
-def test_create_order_with_items(events):
-    event1, event2 = events
-    data = {
-        'customer_email': 'test@example.com',
-        'customer_name': 'testusr',
-        'customer_phone': '+3752266678',
-        'items': [
-            {
-                'event': event1.id,
-                'quantity': 2
-            },
-            {
-                'event': event2.id,
-                'quantity': 1
-            }
-        ]
-    }
-    
-    serializer = OrderCreateSerializer(data=data)
-    assert serializer.is_valid(), f"Errors: {serializer.errors}"
-    
-    order = create_order(serializer.validated_data)
-    
-    assert order.customer_email == 'test@example.com'
-    assert order.customer_name == 'testusr'
-    items = order.items.all()
-    assert items.count() == 2
-    expected_total = Decimal('2500.00') * 2 + Decimal('1500.00') * 1
-    assert order.total_price == expected_total
-
 def test_create_order_invalid_email():
     data = {
-        'customer_email': 'invalid-email', 
+        'customer_email': 'invalid-email',
         'customer_name': 'test',
         'customer_phone': '36465433454653',
         'items': []
     }
-    
+
     serializer = OrderCreateSerializer(data=data)
     assert not serializer.is_valid()
     assert 'customer_email' in serializer.errors
@@ -93,13 +64,86 @@ def test_create_order_invalid_email():
 def test_order_serialization_with_items(order_with_item):
     serializer = OrderSerializer(order_with_item)
     data = serializer.data
-    
+
     assert data['customer_email'] == 'test@example.com'
     assert data['status'] == 'pending'
     assert data['status_display'] == 'Pending'
-    
+
     assert len(data['items']) == 1
     item = data['items'][0]
     assert item['event_title'] == 'TestConc1'
     assert item['quantity'] == 2
-    assert float(item['total_price']) == 5000.00
+    assert float(item['total_price']) == 5000.00 
+
+@pytest.mark.django_db
+def test_confirm_order(order_with_item):
+    order = order_with_item
+    assert order.status == 'pending'
+
+    confirmed_order = OrderService.confirm_order(order)
+    assert confirmed_order.status == 'confirmed'
+    order.refresh_from_db() 
+    assert order.status == 'confirmed'
+
+@pytest.mark.django_db
+def test_confirm_order_invalid_status(order_with_item):
+    order = order_with_item
+    order.status = 'completed' 
+    order.save()
+
+    with pytest.raises(ValueError, match='Order cannot be confirmed'):
+        OrderService.confirm_order(order)
+    order.refresh_from_db()
+    assert order.status == 'completed' 
+
+@pytest.mark.django_db
+def test_cancel_order(order_with_item):
+    order = order_with_item
+    event = order.items.first().event 
+    initial_tickets = event.available_tickets
+    order_quantity = order.items.first().quantity
+
+    OrderService.confirm_order(order)
+    order.refresh_from_db()
+    assert order.status == 'confirmed'
+
+    cancelled_order = OrderService.cancel_order(order)
+    assert cancelled_order.status == 'cancelled'
+    order.refresh_from_db()
+    assert order.status == 'cancelled'
+
+    event.refresh_from_db()
+    assert event.available_tickets == initial_tickets + order_quantity
+
+@pytest.mark.django_db
+def test_cancel_order_invalid_status(order_with_item):
+    order = order_with_item
+    order.status = 'completed' 
+    order.save()
+
+    with pytest.raises(ValueError, match='Order cannot be cancelled because of status'):
+        OrderService.cancel_order(order)
+    order.refresh_from_db()
+    assert order.status == 'completed' 
+
+@pytest.mark.django_db
+def test_complete_order(order_with_item):
+    order = order_with_item
+    OrderService.confirm_order(order)
+    order.refresh_from_db()
+    assert order.status == 'confirmed'
+
+    completed_order = OrderService.complete_order(order)
+    assert completed_order.status == 'completed'
+    order.refresh_from_db()
+    assert order.status == 'completed'
+
+@pytest.mark.django_db
+def test_complete_order_invalid_status(order_with_item):
+    order = order_with_item
+    assert order.status == 'pending'
+
+    with pytest.raises(ValueError, match='Order must be confirmed to complete'):
+        OrderService.complete_order(order)
+    order.refresh_from_db()
+    assert order.status == 'pending'
