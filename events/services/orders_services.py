@@ -1,7 +1,7 @@
 from django.db import transaction
-from events.models import Order, OrderItem
+from events.models import Order, OrderItem, Event
 from .events_services import EventService
-
+from rest_framework.serializers import ValidationError
 
 class OrderService:
     """Service class for managing order-related operations
@@ -21,7 +21,18 @@ class OrderService:
            Order: Created Order object with associated items
         """
         items_data = validated_data.pop('items', [])
-        
+
+        for item_data in items_data:
+            event_obj = item_data['event']
+            quantity = item_data['quantity']
+            event_obj.refresh_from_db()
+
+            #check available tickets
+            if not EventService.check_ticket_availability(event_obj, quantity):
+                raise ValidationError(
+                    f"Not enough tickets for event '{event_obj.title}'. Available: {event_obj.available_tickets}, requested: {quantity}"
+                )
+
         with transaction.atomic():
             order = Order.objects.create(**validated_data)
             

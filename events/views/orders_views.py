@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 
 from events.models import Order, OrderItem
-from events.serializers.orders_serializers import OrderSerializer, OrderItemSerializer, OrderCreateSerializer
+from events.serializers.orders_serializers import OrderSerializer, OrderCreateSerializer
 from events.services.orders_services import OrderService
 from events.services.cart_services import CartService
 
