@@ -12,6 +12,18 @@ from events.services.cart_services import CartService
 
 
 class OrderViewSet(viewsets.ModelViewSet):
+    """"ViewSet for managing orders objects
+
+    Provides full CRUD operations for orders
+
+    Supported filters:
+        Ordering by fields: created_at, total_price
+        Filtering by fields: status,  customer_email
+        Default ordering (-created_at).
+
+    Permissions:
+        AllowAny
+    """
     queryset = Order.objects.prefetch_related('items__event').all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['status', 'customer_email']
@@ -20,11 +32,30 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
 
     def get_serializer_class(self):
+        """Function that returns serializer based on action
+
+        Returns:
+            OrderCreateSerializer: For action  "create"
+            OrderSerializer: Otherwise, for getting orders
+        """
         if self.action == 'create':
             return OrderCreateSerializer
         return OrderSerializer
 
     def create(self, request, *args, **kwargs):
+        """Create a new order with associated items and clear the cart
+
+        Attributes:
+            request : HTTP request
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Response: Serialized order data with status 201 on success
+        
+        Raises:
+            error: error message with status 400 on failure.
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -42,6 +73,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
+        """Confirm an existing order
+
+        Attributes:
+            request: HTTP request
+            pk: Primary Key of the order to confirm
+
+        Returns:
+            Response: Serialized order data on success
+
+        Raises:
+            error: Error message with status 400
+        """
         order = self.get_object()
         
         try:
@@ -56,6 +99,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
+        """Cancel an existing order
+
+        Attributes:
+            request: HTTP request
+            pk: Primary Key of the order to cancel
+
+        Returns:
+            Responce: Serialized order data on success
+        
+        Raises:
+            error: Error message with status 400
+        """
         order = self.get_object()
         
         try:
@@ -70,6 +125,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
+        """Complete the existing order
+
+        Attributes:
+            request: HTTP request
+            pk: Primary Key of the order to complete
+
+        Returns:
+            Responce: Serialized order data on success
+        
+        Raises:
+            error: Error message with status 400
+        """
         order = self.get_object()
         
         try:
@@ -83,9 +150,3 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
 
-class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = OrderItem.objects.select_related('event', 'order').all()
-    serializer_class = OrderItemSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['order', 'event']
-    permission_classes = [AllowAny]

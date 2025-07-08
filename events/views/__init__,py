@@ -1,9 +1,0 @@
-from .events_views import EventViewSet, EventImageViewSet
-from .orders_views import OrderViewSet, OrderItemViewSet
-from .cart_views import CartViewSet
-
-__all__ = [
-    'EventViewSet', 'EventImageViewSet',
-    'OrderViewSet', 'OrderItemViewSet',
-    'CartViewSet'
-]
