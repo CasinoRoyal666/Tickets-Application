@@ -5,11 +5,13 @@ from events.services.events_services import EventService
 from decimal import Decimal
 from django.utils import timezone
 
-#To awoid warning messages, related to time zone 
-date = timezone.now() + timezone.timedelta(days=30)
 
 class EventServiceTestCase(TestCase):
     def setUp(self):
+        
+        #To awoid warning messages, related to time zone 
+        date = timezone.now() + timezone.timedelta(days=30)
+        
         self.event = Event.objects.create(
             title="TestEvent",
             description="Desc of test event",
