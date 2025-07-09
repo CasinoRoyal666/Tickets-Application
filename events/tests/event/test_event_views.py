@@ -6,6 +6,9 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from events.models import Event, EventImage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
+from PIL import Image 
+from io import BytesIO
 
 @pytest.mark.django_db
 class TestEventViewSet:
@@ -16,13 +19,17 @@ class TestEventViewSet:
     
     @pytest.fixture
     def sample_events(self):
+
+        #To awoid warning messages, related to time zone 
+        event_date = timezone.now() + timezone.timedelta(days=30)
+
         events = []
         for i in range(3):
             event = Event.objects.create(
                 title=f"Event {i+1}",
                 description=f"Description {i+1}",
                 category="concert", 
-                date="2025-12-31T20:00:00Z",
+                date= event_date,
                 location=f"Location {i+1}",
                 price=Decimal(f'{100 + i*10}.00'),
                 available_tickets=50 + i*10
@@ -84,7 +91,7 @@ class TestEventViewSet:
             'title': 'Updated Event',
             'description': event.description,
             'category': event.category,
-            'date': event.date,
+            'date': event.date.isoformat().replace('+00:00', 'Z'),
             'location': event.location,
             'price': str(event.price),
             'available_tickets': event.available_tickets
@@ -105,22 +112,31 @@ class TestEventViewSet:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Event.objects.filter(id=event.id).exists()
     
-    def test_search_events(self, api_client, sample_events):
+    @pytest.mark.parametrize("search_term, expected_count, expected_title", [
+        ("Event 1", 1, "Event 1"),
+        ("Event", 3, None),
+        ("NonExistent", 0, None),
+    ])
+    def test_search_events(self, api_client, sample_events, search_term, expected_count, expected_title):
         url = reverse('event-list')
-        response = api_client.get(url, {'search': 'Event 1'})
+        response = api_client.get(url, {'search': search_term})
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data['results']) == 1
-        assert response.data['results'][0]['title'] == 'Event 1'
-    
-    def test_order_events_by_price(self, api_client, sample_events):
+        assert len(response.data['results']) == expected_count
+        if expected_title:
+            assert response.data['results'][0]['title'] == expected_title
+
+    @pytest.mark.parametrize("ordering_field", ["price", "-price"])
+    def test_order_events_by_price(self, api_client, sample_events, ordering_field):
         url = reverse('event-list')
-        response = api_client.get(url, {'ordering': 'price'})
+        response = api_client.get(url, {'ordering': ordering_field})
         
         assert response.status_code == status.HTTP_200_OK
         prices = [Decimal(event['price']) for event in response.data['results']]
-        assert prices == sorted(prices)
-    
+        
+        is_reversed = ordering_field.startswith('-')
+        assert prices == sorted(prices, reverse=is_reversed)
+
     def test_get_event_images(self, api_client, event_with_images):
         url = reverse('event-images', kwargs={'pk': event_with_images.id})
         response = api_client.get(url)
@@ -134,25 +150,29 @@ class TestEventViewSet:
         response = api_client.get(url)
         
         assert response.status_code == status.HTTP_404_NOT_FOUND
+    #To resolve the problem with this test in import were added Image from Pillow and
+    #ButesIO from io. I just created a simple image, and now ImageField know that it is an real image
+    def test_add_event_image(self, api_client, sample_events):
+        event = sample_events[0]
+        url = reverse('event-images', kwargs={'pk': event.id})
+        
+        image_buffer = BytesIO()
+        image_obj = Image.new('RGB', (10,10), color='blue')
+        image_obj.save(image_buffer, format='jpeg')
+        image_buffer.seek(0)
 
-        """I don't understand what the problem is, but when manually testing in Postman, adding an image works correctly
-        """
-    # def test_add_event_image(self, api_client, sample_events):
-    #     event = sample_events[0]
-    #     url = reverse('event-images', kwargs={'pk': event.id})
+        image_file = SimpleUploadedFile(
+            "test_image.jpg",
+            image_buffer.read(),
+            content_type="image/jpeg"
+        )
         
-    #     image_file = SimpleUploadedFile(
-    #         "test_image.jpg",
-    #         b"file_content",
-    #         content_type="image/jpg"
-    #     )
+        data = {'image': image_file}
+        response = api_client.post(url, data, format='multipart')
         
-    #     data = {'image': image_file}
-    #     response = api_client.post(url, data, format='multipart')
-        
-    #     assert response.status_code == status.HTTP_201_CREATED
-    #     assert EventImage.objects.filter(event=event).exists()
-    
+        assert response.status_code == status.HTTP_201_CREATED
+        assert EventImage.objects.filter(event=event).count() == 1
+
     def test_delete_event_image(self, api_client, event_with_images):
         image = event_with_images.images.first()
         url = reverse('event-delete-image', kwargs={

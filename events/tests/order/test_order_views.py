@@ -134,94 +134,137 @@ class TestOrderViewSet:
         assert 'non_field_errors' in response.data['items'][0]
         assert 'Not enough tickets for event' in response.data['items'][0]['non_field_errors'][0]
 
-    def test_confirm_order_success(self, api_client, sample_orders):
+    @pytest.mark.parametrize("initial_status,expected_status,expected_http_status", [
+        ('pending', 'confirmed', status.HTTP_200_OK),
+    ])
+    def test_confirm_order_success(self, api_client, sample_orders, initial_status, expected_status, expected_http_status):
         order = sample_orders[0]
-        url = reverse('order-confirm', kwargs={'pk': order.id})
-        response = api_client.post(url)
-        
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data['status'] == 'confirmed'
-        
-        order.refresh_from_db()
-        assert order.status == 'confirmed'
-    
-    def test_confirm_order_wrong_status(self, api_client, sample_orders):
-        order = sample_orders[0]
-        order.status = 'completed'
+        order.status = initial_status
         order.save()
         
         url = reverse('order-confirm', kwargs={'pk': order.id})
         response = api_client.post(url)
         
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == expected_http_status
+        assert response.data['status'] == expected_status
+        
+        order.refresh_from_db()
+        assert order.status == expected_status
+    
+    @pytest.mark.parametrize("invalid_status,expected_http_status", [
+        ('completed', status.HTTP_400_BAD_REQUEST),
+        ('confirmed', status.HTTP_400_BAD_REQUEST),
+        ('cancelled', status.HTTP_400_BAD_REQUEST),
+    ])
+    def test_confirm_order_wrong_status(self, api_client, sample_orders, invalid_status, expected_http_status):
+        order = sample_orders[0]
+        order.status = invalid_status
+        order.save()
+        
+        url = reverse('order-confirm', kwargs={'pk': order.id})
+        response = api_client.post(url)
+        
+        assert response.status_code == expected_http_status
         assert 'error' in response.data
     
-    def test_cancel_order_success(self, api_client, sample_orders, sample_events):
+    @pytest.mark.parametrize("initial_status,expected_status,expected_http_status", [
+        ('pending', 'cancelled', status.HTTP_200_OK),
+        ('confirmed', 'cancelled', status.HTTP_200_OK),
+    ])
+    def test_cancel_order_success(self, api_client, sample_orders, sample_events, initial_status, expected_status, expected_http_status):
         order = sample_orders[0]
+        order.status = initial_status
+        order.save()
+        
         initial_tickets = sample_events[0].available_tickets
         
         url = reverse('order-cancel', kwargs={'pk': order.id})
         response = api_client.post(url)
         
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data['status'] == 'cancelled'
+        assert response.status_code == expected_http_status
+        assert response.data['status'] == expected_status
         
         sample_events[0].refresh_from_db()
         assert sample_events[0].available_tickets == initial_tickets + 2
     
-    def test_cancel_order_wrong_status(self, api_client, sample_orders):
+    @pytest.mark.parametrize("invalid_status,expected_http_status", [
+        ('completed', status.HTTP_400_BAD_REQUEST),
+        ('cancelled', status.HTTP_400_BAD_REQUEST),
+    ])
+    def test_cancel_order_wrong_status(self, api_client, sample_orders, invalid_status, expected_http_status):
         order = sample_orders[0]
-        order.status = 'completed'
+        order.status = invalid_status
         order.save()
         
         url = reverse('order-cancel', kwargs={'pk': order.id})
         response = api_client.post(url)
         
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == expected_http_status
         assert 'error' in response.data
     
-    def test_complete_order_success(self, api_client, sample_orders):
+    @pytest.mark.parametrize("initial_status,expected_status,expected_http_status", [
+        ('confirmed', 'completed', status.HTTP_200_OK),
+    ])
+    def test_complete_order_success(self, api_client, sample_orders, initial_status, expected_status, expected_http_status):
         order = sample_orders[0]
-        order.status = 'confirmed'
+        order.status = initial_status
         order.save()
         
         url = reverse('order-complete', kwargs={'pk': order.id})
         response = api_client.post(url)
         
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data['status'] == 'completed'
+        assert response.status_code == expected_http_status
+        assert response.data['status'] == expected_status
         
         order.refresh_from_db()
-        assert order.status == 'completed'
+        assert order.status == expected_status
     
-    def test_complete_order_wrong_status(self, api_client, sample_orders):
+    @pytest.mark.parametrize("invalid_status,expected_http_status", [
+        ('pending', status.HTTP_400_BAD_REQUEST),
+        ('cancelled', status.HTTP_400_BAD_REQUEST),
+        ('completed', status.HTTP_400_BAD_REQUEST),
+    ])
+    def test_complete_order_wrong_status(self, api_client, sample_orders, invalid_status, expected_http_status):
         order = sample_orders[0]
-        assert order.status == 'pending'
+        order.status = invalid_status
+        order.save()
         
         url = reverse('order-complete', kwargs={'pk': order.id})
         response = api_client.post(url)
         
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == expected_http_status
         assert 'error' in response.data
     
-    def test_filter_orders_by_status(self, api_client, sample_orders):
+    @pytest.mark.parametrize("filter_status,expected_count", [
+        ('confirmed', 1),
+        ('pending', 1),
+    ])
+    def test_filter_orders_by_status(self, api_client, sample_orders, filter_status, expected_count):
         sample_orders[0].status = 'confirmed'
         sample_orders[0].save()
         
         url = reverse('order-list')
-        response = api_client.get(url, {'status': 'confirmed'})
+        response = api_client.get(url, {'status': filter_status})
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data['results']) == 1 
-        assert response.data['results'][0]['status'] == 'confirmed' 
+        assert len(response.data['results']) == expected_count
+        if expected_count > 0:
+            assert response.data['results'][0]['status'] == filter_status
     
-    def test_filter_orders_by_customer_email(self, api_client, sample_orders):
+    @pytest.mark.parametrize("filter_email,expected_count", [
+        ('customer1@example.com', 1),
+        ('customer2@example.com', 1),
+        ('nonexistent@example.com', 0),
+    ])
+    def test_filter_orders_by_customer_email(self, api_client, sample_orders, filter_email, expected_count):
         url = reverse('order-list')
-        response = api_client.get(url, {'customer_email': 'customer1@example.com'})
+        response = api_client.get(url, {'customer_email': filter_email})
         
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data['results']) == 1 
-        assert response.data['results'][0]['customer_email'] == 'customer1@example.com'
+        assert len(response.data['results']) == expected_count
+        if expected_count > 0:
+            assert response.data['results'][0]['customer_email'] == filter_email
+    
     def test_order_not_found(self, api_client):
         url = reverse('order-detail', kwargs={'pk': 999})
         response = api_client.get(url)

@@ -20,7 +20,7 @@ def event():
 def test_event_serialization(event):
     serializer = EventSerializer(event)
     data = serializer.data
-    
+
     assert data['title'] == 'TestConc'
     assert data['category'] == 'concert'
     assert data['category_display'] == 'Concert'
@@ -38,21 +38,33 @@ def test_event_deserialization_valid():
         'price': '3000.00',
         'available_tickets': 200
     }
-    
+
     serializer = EventSerializer(data=data)
-    assert serializer.is_valid()
-    
+    assert serializer.is_valid(raise_exception=True)
+
     event = serializer.save()
     assert event.title == 'TestConc'
     assert event.category == 'sports'
 
 @pytest.mark.django_db
-def test_event_deserialization_invalid():
-    data = {
-        'title': '',  
-        'price': '-100',  
+@pytest.mark.parametrize("invalid_data, error_field", [
+    ({'title': ''}, 'title'),
+    ({'price': '-100'}, 'price'),
+    ({'available_tickets': -10}, 'available_tickets'),
+    ({'date': 'invalid-date'}, 'date'),
+])
+def test_event_deserialization_invalid(invalid_data, error_field):
+    valid_data = {
+        'title': 'Valid Title',
+        'description': 'Valid desc',
+        'category': 'sports',
+        'date': '2025-09-20T19:00:00Z',
+        'location': 'valid loc',
+        'price': '3000.00',
+        'available_tickets': 200
     }
+    data = {**valid_data, **invalid_data}
     
     serializer = EventSerializer(data=data)
     assert not serializer.is_valid()
-    assert 'title' in serializer.errors
+    assert error_field in serializer.errors

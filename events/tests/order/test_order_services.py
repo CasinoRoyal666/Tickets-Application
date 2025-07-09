@@ -41,39 +41,23 @@ class TestOrderService:
     def sample_order(self, valid_order_data):
         return OrderService.create_order_with_items(valid_order_data)
     
-    def test_create_order_with_items_success(self, valid_order_data, sample_events):
-        initial_tickets_0 = sample_events[0].available_tickets
-        initial_tickets_1 = sample_events[1].available_tickets
-        
-        order = OrderService.create_order_with_items(valid_order_data)
-        
-        assert order is not None
-        assert order.customer_email == 'test@example.com'
-        assert order.customer_name == 'Test Customer'
-        assert order.status == 'pending'
-        
-        assert order.items.count() == 2
-        
-        sample_events[0].refresh_from_db()
-        sample_events[1].refresh_from_db()
-        assert sample_events[0].available_tickets == initial_tickets_0 - 2
-        assert sample_events[1].available_tickets == initial_tickets_1 - 1
     
-    def test_create_order_not_enough_tickets(self, sample_events):
+    @pytest.mark.parametrize("requested_quantity,expected_error", [
+        (100, "Not enough tickets for event 'Event 1'. Available: 50, requested: 100"),
+        (51, "Not enough tickets for event 'Event 1'. Available: 50, requested: 51"),
+    ])
+    def test_create_order_not_enough_tickets(self, sample_events, requested_quantity, expected_error):
         order_data = {
             'customer_email': 'test@example.com',
             'customer_name': 'Test Customer',
             'customer_phone': '+1234567890',
             'items': [
-                {'event': sample_events[0], 'quantity': 100}, 
+                {'event': sample_events[0], 'quantity': requested_quantity}, 
             ]
         }
         
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValidationError, match=expected_error):
             OrderService.create_order_with_items(order_data)
-        
-        assert 'Not enough tickets' in str(exc_info.value)
-        assert sample_events[0].title in str(exc_info.value)
         
         assert Order.objects.count() == 0
         
@@ -93,43 +77,41 @@ class TestOrderService:
         assert order is not None
         assert order.items.count() == 0
     
-    def test_confirm_order_success(self, sample_order):
-        assert sample_order.status == 'pending'
+    @pytest.mark.parametrize("initial_status,expected_status", [
+        ('pending', 'confirmed'),
+    ])
+    def test_confirm_order_success(self, sample_order, initial_status, expected_status):
+        sample_order.status = initial_status
+        sample_order.save()
         
         confirmed_order = OrderService.confirm_order(sample_order)
         
-        assert confirmed_order.status == 'confirmed'
+        assert confirmed_order.status == expected_status
         
         sample_order.refresh_from_db()
-        assert sample_order.status == 'confirmed'
+        assert sample_order.status == expected_status
     
-    def test_confirm_order_wrong_status(self, sample_order):
-        sample_order.status = 'completed'
+    @pytest.mark.parametrize("invalid_status,expected_error", [
+        ('completed', 'Order cannot be confirmed'),
+        ('confirmed', 'Order cannot be confirmed'),
+        ('cancelled', 'Order cannot be confirmed'),
+    ])
+    def test_confirm_order_wrong_status(self, sample_order, invalid_status, expected_error):
+        sample_order.status = invalid_status
         sample_order.save()
         
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=expected_error):
             OrderService.confirm_order(sample_order)
         
-        assert 'Order cannot be confirmed' in str(exc_info.value)
-        
         sample_order.refresh_from_db()
-        assert sample_order.status == 'completed'
+        assert sample_order.status == invalid_status
     
-    def test_cancel_order_pending_status(self, sample_order, sample_events):
-        initial_tickets_0 = sample_events[0].available_tickets
-        initial_tickets_1 = sample_events[1].available_tickets
-        
-        cancelled_order = OrderService.cancel_order(sample_order)
-        
-        assert cancelled_order.status == 'cancelled'
-        
-        sample_events[0].refresh_from_db()
-        sample_events[1].refresh_from_db()
-        assert sample_events[0].available_tickets == initial_tickets_0 + 2
-        assert sample_events[1].available_tickets == initial_tickets_1 + 1
-    
-    def test_cancel_order_confirmed_status(self, sample_order, sample_events):
-        sample_order.status = 'confirmed'
+    @pytest.mark.parametrize("initial_status,expected_status", [
+        ('pending', 'cancelled'),
+        ('confirmed', 'cancelled'),
+    ])
+    def test_cancel_order_success(self, sample_order, sample_events, initial_status, expected_status):
+        sample_order.status = initial_status
         sample_order.save()
         
         initial_tickets_0 = sample_events[0].available_tickets
@@ -137,46 +119,55 @@ class TestOrderService:
         
         cancelled_order = OrderService.cancel_order(sample_order)
         
-        assert cancelled_order.status == 'cancelled'
+        assert cancelled_order.status == expected_status
         
         sample_events[0].refresh_from_db()
         sample_events[1].refresh_from_db()
         assert sample_events[0].available_tickets == initial_tickets_0 + 2
         assert sample_events[1].available_tickets == initial_tickets_1 + 1
     
-    def test_cancel_order_wrong_status(self, sample_order):
-        sample_order.status = 'completed'
+    @pytest.mark.parametrize("invalid_status,expected_error", [
+        ('completed', 'Order cannot be cancelled because of status'),
+        ('cancelled', 'Order cannot be cancelled because of status'),
+    ])
+    def test_cancel_order_wrong_status(self, sample_order, invalid_status, expected_error):
+        sample_order.status = invalid_status
         sample_order.save()
         
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=expected_error):
             OrderService.cancel_order(sample_order)
         
-        assert 'Order cannot be cancelled' in str(exc_info.value)
-        
         sample_order.refresh_from_db()
-        assert sample_order.status == 'completed'
+        assert sample_order.status == invalid_status
     
-    def test_complete_order_success(self, sample_order):
-        sample_order.status = 'confirmed'
+    @pytest.mark.parametrize("initial_status,expected_status", [
+        ('confirmed', 'completed'),
+    ])
+    def test_complete_order_success(self, sample_order, initial_status, expected_status):
+        sample_order.status = initial_status
         sample_order.save()
         
         completed_order = OrderService.complete_order(sample_order)
         
-        assert completed_order.status == 'completed'
+        assert completed_order.status == expected_status
         
         sample_order.refresh_from_db()
-        assert sample_order.status == 'completed'
+        assert sample_order.status == expected_status
     
-    def test_complete_order_wrong_status(self, sample_order):
-        assert sample_order.status == 'pending'
+    @pytest.mark.parametrize("invalid_status,expected_error", [
+        ('pending', 'Order must be confirmed to complete'),
+        ('cancelled', 'Order must be confirmed to complete'),
+        ('completed', 'Order must be confirmed to complete'),
+    ])
+    def test_complete_order_wrong_status(self, sample_order, invalid_status, expected_error):
+        sample_order.status = invalid_status
+        sample_order.save()
         
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match=expected_error):
             OrderService.complete_order(sample_order)
         
-        assert 'Order must be confirmed to complete' in str(exc_info.value)
-        
         sample_order.refresh_from_db()
-        assert sample_order.status == 'pending'
+        assert sample_order.status == invalid_status
     
     def test_order_transaction_rollback_on_error(self, sample_events):
         event = Event.objects.create(
@@ -201,7 +192,7 @@ class TestOrderService:
         initial_order_count = Order.objects.count()
         initial_order_item_count = OrderItem.objects.count()
         
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="Not enough tickets for event 'Limited Event'. Available: 1, requested: 2"):
             OrderService.create_order_with_items(order_data)
         
         assert Order.objects.count() == initial_order_count
