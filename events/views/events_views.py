@@ -63,16 +63,10 @@ class EventViewSet(viewsets.ModelViewSet):
         event = self.get_object()
         
         if request.method == 'GET':
-            images = EventService.get_event_images(pk)
-            if images is None:
-                return Response(
-                    {'error': 'Event not found'}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
+            images = event.images.all()
             serializer = EventImageSerializer(images, many=True)
             return Response(serializer.data)
-        
+
         elif request.method == 'POST':
             serializer = EventImageSerializer(data=request.data, context={'event': event})
             if serializer.is_valid():

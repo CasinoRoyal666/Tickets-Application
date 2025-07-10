@@ -76,74 +76,98 @@ def test_order_serialization_with_items(order_with_item):
     assert float(item['total_price']) == 5000.00 
 
 @pytest.mark.django_db
-def test_confirm_order(order_with_item):
+@pytest.mark.parametrize("initial_status,expected_status", [
+    ('pending', 'confirmed'),
+])
+def test_confirm_order_success(order_with_item, initial_status, expected_status):
     order = order_with_item
-    assert order.status == 'pending'
-
-    confirmed_order = OrderService.confirm_order(order)
-    assert confirmed_order.status == 'confirmed'
-    order.refresh_from_db() 
-    assert order.status == 'confirmed'
-
-@pytest.mark.django_db
-def test_confirm_order_invalid_status(order_with_item):
-    order = order_with_item
-    order.status = 'completed' 
+    order.status = initial_status
     order.save()
 
-    with pytest.raises(ValueError, match='Order cannot be confirmed'):
-        OrderService.confirm_order(order)
-    order.refresh_from_db()
-    assert order.status == 'completed' 
+    confirmed_order = OrderService.confirm_order(order)
+    assert confirmed_order.status == expected_status
+    order.refresh_from_db() 
+    assert order.status == expected_status
 
 @pytest.mark.django_db
-def test_cancel_order(order_with_item):
+@pytest.mark.parametrize("invalid_status,expected_error", [
+    ('completed', 'Order cannot be confirmed'),
+    ('confirmed', 'Order cannot be confirmed'),
+    ('cancelled', 'Order cannot be confirmed'),
+])
+def test_confirm_order_invalid_status(order_with_item, invalid_status, expected_error):
     order = order_with_item
+    order.status = invalid_status
+    order.save()
+
+    with pytest.raises(ValueError, match=expected_error):
+        OrderService.confirm_order(order)
+    order.refresh_from_db()
+    assert order.status == invalid_status
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("initial_status,expected_status", [
+    ('pending', 'cancelled'),
+    ('confirmed', 'cancelled'),
+])
+def test_cancel_order_success(order_with_item, initial_status, expected_status):
+    order = order_with_item
+    order.status = initial_status
+    order.save()
+    
     event = order.items.first().event 
     initial_tickets = event.available_tickets
     order_quantity = order.items.first().quantity
 
-    OrderService.confirm_order(order)
-    order.refresh_from_db()
-    assert order.status == 'confirmed'
-
     cancelled_order = OrderService.cancel_order(order)
-    assert cancelled_order.status == 'cancelled'
+    assert cancelled_order.status == expected_status
     order.refresh_from_db()
-    assert order.status == 'cancelled'
+    assert order.status == expected_status
 
     event.refresh_from_db()
     assert event.available_tickets == initial_tickets + order_quantity
 
 @pytest.mark.django_db
-def test_cancel_order_invalid_status(order_with_item):
+@pytest.mark.parametrize("invalid_status,expected_error", [
+    ('completed', 'Order cannot be cancelled because of status'),
+    ('cancelled', 'Order cannot be cancelled because of status'),
+])
+def test_cancel_order_invalid_status(order_with_item, invalid_status, expected_error):
     order = order_with_item
-    order.status = 'completed' 
+    order.status = invalid_status
     order.save()
 
-    with pytest.raises(ValueError, match='Order cannot be cancelled because of status'):
+    with pytest.raises(ValueError, match=expected_error):
         OrderService.cancel_order(order)
     order.refresh_from_db()
-    assert order.status == 'completed' 
+    assert order.status == invalid_status
 
 @pytest.mark.django_db
-def test_complete_order(order_with_item):
+@pytest.mark.parametrize("initial_status,expected_status", [
+    ('confirmed', 'completed'),
+])
+def test_complete_order_success(order_with_item, initial_status, expected_status):
     order = order_with_item
-    OrderService.confirm_order(order)
-    order.refresh_from_db()
-    assert order.status == 'confirmed'
+    order.status = initial_status
+    order.save()
 
     completed_order = OrderService.complete_order(order)
-    assert completed_order.status == 'completed'
+    assert completed_order.status == expected_status
     order.refresh_from_db()
-    assert order.status == 'completed'
+    assert order.status == expected_status
 
 @pytest.mark.django_db
-def test_complete_order_invalid_status(order_with_item):
+@pytest.mark.parametrize("invalid_status,expected_error", [
+    ('pending', 'Order must be confirmed to complete'),
+    ('cancelled', 'Order must be confirmed to complete'),
+    ('completed', 'Order must be confirmed to complete'),
+])
+def test_complete_order_invalid_status(order_with_item, invalid_status, expected_error):
     order = order_with_item
-    assert order.status == 'pending'
+    order.status = invalid_status
+    order.save()
 
-    with pytest.raises(ValueError, match='Order must be confirmed to complete'):
+    with pytest.raises(ValueError, match=expected_error):
         OrderService.complete_order(order)
     order.refresh_from_db()
-    assert order.status == 'pending'
+    assert order.status == invalid_status

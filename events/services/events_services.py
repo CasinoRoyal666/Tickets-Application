@@ -15,9 +15,6 @@ class EventService:
 
         Returns:
             QuerySet: Collection of EventImage objects if the event exists, None otherwise
-
-        Raises:
-            Event.DoesNotExist: If the event with the given ID does not exist
         """
         try:
             event = Event.objects.get(id=event_id)
