@@ -56,6 +56,7 @@ class Order(BaseModel):
     customer_name = models.CharField(max_length=25)
     customer_phone =models.CharField(max_length=20)
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING)
+    session_key = models.CharField(max_length=40, null=True, blank=True, db_index=True)
 
     @property
     def total_price(self):

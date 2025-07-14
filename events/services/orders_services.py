@@ -11,7 +11,7 @@ class OrderService:
     and ticket availability updates.
     """
     @staticmethod
-    def create_order_with_items(validated_data):
+    def create_order_with_items(validated_data, session_key=None):
         """Create an order with associated items and update ticket availability
 
         Attributes:
@@ -34,7 +34,7 @@ class OrderService:
                 )
 
         with transaction.atomic():
-            order = Order.objects.create(**validated_data)
+            order = Order.objects.create(**validated_data, session_key=session_key)
             
             for item_data in items_data:
                 OrderItem.objects.create(

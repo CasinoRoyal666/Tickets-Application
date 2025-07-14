@@ -24,13 +24,17 @@ class OrderViewSet(viewsets.ModelViewSet):
     Permissions:
         AllowAny
     """
-    queryset = Order.objects.prefetch_related('items__event').all()
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['status', 'customer_email']
     ordering_fields = ['created_at', 'total_price']
     ordering = ['-created_at']
     permission_classes = [AllowAny]
 
+    def get_queryset(self):
+        if self.request.session and self.request.session.session_key:
+            return Order.objects.filter(session_key=self.request.session.session_key).prefetch_related('items__event')
+        return Order.objects.none()
+    
     def get_serializer_class(self):
         """Function that returns serializer based on action
 
@@ -60,8 +64,16 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         try:
-            order = OrderService.create_order_with_items(serializer.validated_data)
-            request.session['cart'] = CartService.clear_cart()
+            if not request.session.session_key:
+                request.session.create()
+            session_key = request.session.session_key
+
+            order = OrderService.create_order_with_items(serializer.validated_data, session_key)
+            
+            if 'cart' in request.session:
+                del request.session['cart']
+                request.session.modified = True
+            
             order_serializer = OrderSerializer(order)
             return Response(order_serializer.data, status=status.HTTP_201_CREATED)
         
