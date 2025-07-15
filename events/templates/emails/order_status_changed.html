@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order #{{ order.id }} Status Update</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin: 0;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .content p {
+            margin-bottom: 10px;
+        }
+        .status-box {
+            background-color: #e0f7fa;
+            border-left: 5px solid #00bcd4;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status-box.pending {
+            background-color: #fffde7;
+            border-left-color: #ffc107;
+        }
+        .status-box.confirmed {
+            background-color: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+        .status-box.cancelled {
+            background-color: #ffebee;
+            border-left-color: #f44336;
+        }
+        .status-box.completed {
+            background-color: #e3f2fd;
+            border-left-color: #2196f3;
+        }
+        
+        .order-details {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .order-details h2 {
+            font-size: 18px;
+            color: #555;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .order-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .order-table th,
+        .order-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .order-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #555;
+        }
+        .order-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .event-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .event-date {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .price-column {
+            text-align: right;
+            font-weight: bold;
+        }
+        .quantity-column {
+            text-align: center;
+        }
+        
+        .total {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #28a745;
+            color: #28a745;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Order #{{ order.id }} Status Update</h1>
+        </div>
+
+        <div class="content">
+            <p>Hello, {{ customer_name }}!</p>
+            <p>The status of your order #{{ order.id }} has been updated.</p>
+
+            <div class="status-box {{ status_code }}">
+                Current Status: {{ status }}
+            </div>
+
+            {% if status_code == 'pending' %}
+                <p>Your order is currently awaiting processing. We will notify you once it's confirmed.</p>
+            {% elif status_code == 'confirmed' %}
+                <p>Great news! Your order has been confirmed and is now being prepared.</p>
+            {% elif status_code == 'cancelled' %}
+                <p>We regret to inform you that your order has been cancelled.</p>
+            {% elif status_code == 'completed' %}
+                <p>Your order has been successfully completed. Enjoy!</p>
+            {% else %}
+                <p>The status of your order is currently {{ status }}.</p>
+            {% endif %}
+
+            <div class="order-details">
+                <h2>Order Details:</h2>
+                <table class="order-table">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Date & Time</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                <div class="event-title">{{ item.event.title }}</div>
+                            </td>
+                            <td>
+                                <div class="event-date">{{ item.event.date|date:"d.m.Y H:i" }}</div>
+                            </td>
+                            <td class="quantity-column">{{ item.quantity }}</td>
+                            <td class="price-column">${{ item.unit_price|floatformat:2 }}</td>
+                            <td class="price-column">${{ item.total_price|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <div class="total">
+                    Total Price: ${{ total_price|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
