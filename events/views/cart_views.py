@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from events.models import Event 
+from rest_framework.exceptions import ValidationError
 
 from events.serializers.cart_serializers import CartItemSerializer
 from events.services.cart_services import CartService
@@ -48,10 +50,32 @@ class CartViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         
         event_id = serializer.validated_data['event_id']
-        quantity = serializer.validated_data['quantity']
+        quantity_to_add = serializer.validated_data['quantity']
         
+        try:
+            event = Event.objects.get(pk=event_id)
+        except Event.DoesNotExist:
+            return Response({'error': 'Event not found'}, status=status.HTTP_404_NOT_FOUND)
+
         cart = request.session.get('cart', {})
-        cart = CartService.add_to_cart(cart, event_id, quantity)
+        event_id_str = str(event_id)
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+
+        # Получаем текущее количество из корзины. Если товара нет, то 0.
+        # Корзина теперь хранит просто число, а не словарь.
+        existing_quantity = cart.get(event_id_str, 0)
+        new_quantity = existing_quantity + quantity_to_add
+
+        # Проверяем, не превышает ли новое количество доступных билетов
+        if new_quantity > event.available_tickets:
+            tickets_left = event.available_tickets - existing_quantity
+            raise ValidationError(f"Cannot add tickets. Only {tickets_left} tickets left.")
+        
+        # Обновляем корзину, сохраняя только количество.
+        # Это исправляет ошибку TypeError в cart_services.py.
+        cart[event_id_str] = new_quantity
+                
         request.session['cart'] = cart
         
         return self.list(request)
