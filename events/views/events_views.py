@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
-
-from events.models import Event, EventImage
+from ..filters import EventFilter
+from events.models import Event, EventImage, EventCategory
 from events.serializers.events_serializers import EventImageSerializer, EventListSerializer, EventSerializer
 from events.services.events_services import EventService
 
@@ -29,6 +29,7 @@ class EventViewSet(viewsets.ModelViewSet):
     ordering_fields = ['date', 'price', 'created_at']
     ordering = ['date']
     permission_classes = [AllowAny]
+    filterset_class = EventFilter
 
     def get_serializer_class(self):
         """Function that returns serializer based on action
@@ -40,7 +41,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return EventListSerializer
         return EventSerializer
-
+  
     @action(detail=True, methods=['get', 'post'])
     def images(self, request, pk=None):
         """
@@ -124,3 +125,9 @@ class EventViewSet(viewsets.ModelViewSet):
         
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    #get list of categories for transfer
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        categories_data = [{'value': value, 'label': label} for value, label in EventCategory.choices]
+        return Response(categories_data)
