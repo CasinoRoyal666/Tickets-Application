@@ -8,6 +8,7 @@ from ..filters import EventFilter
 from events.models import Event, EventImage, EventCategory
 from events.serializers.events_serializers import EventImageSerializer, EventListSerializer, EventSerializer
 from events.services.events_services import EventService
+from ..paginations import CustomPagination
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -30,6 +31,7 @@ class EventViewSet(viewsets.ModelViewSet):
     ordering = ['date']
     permission_classes = [AllowAny]
     filterset_class = EventFilter
+    pagination_class = CustomPagination
 
     def get_serializer_class(self):
         """Function that returns serializer based on action
